@@ -320,17 +320,7 @@
     </aside>
 
     <main id="viewport">
-        <svg id="svg-root">
-            <g id="world">
-                <g id="zodiac-layer"></g>
-                <g id="orbits-layer"></g>
-                <g id="trails-layer"></g>
-                <g id="markers-layer"></g>
-                <g id="sun-layer"></g>
-                <g id="planets-layer"></g>
-                <g id="moon-system-layer"></g>
-            </g>
-        </svg>
+        <svg id="svg-root"></svg>
 
         <div class="overlay">
             <div style="font-family:var(--mono); font-size:9px; color:var(--text-light); letter-spacing:0.3em;">EDITABLE
@@ -348,190 +338,29 @@
             <div class="unit-group" data-unit="year"><span class="unit-label">YEAR</span><input id="v-year"
                     class="unit-val" value="+002025"></div>
             <span class="sep">/</span>
-            <div class="unit-group" data-unit="month"><span class="unit-label">M</span><input id="v-month"
+                <div class="unit-group" data-unit="month"><span class="unit-label">M</span><input id="v-month"
                     class="unit-val" value="01"></div>
-            <span class="sep">:</span>
-            <div class="unit-group" data-unit="day"><span class="unit-label">D</span><input id="v-day" class="unit-val"
+                <span class="sep">:</span>
+                <div class="unit-group" data-unit="day"><span class="unit-label">D</span><input id="v-day" class="unit-val"
                     value="01"></div>
             <span class="sep">/</span>
             <div class="unit-group" data-unit="hour"><span class="unit-label">H</span><span id="v-hour" class="unit-val"
                     style="cursor:default">00</span></div>
             <span class="sep">:</span>
-            <div class="unit-group" data-unit="minute"><span class="unit-label">M</span><span id="v-min"
+                <div class="unit-group" data-unit="minute"><span class="unit-label">M</span><span id="v-min"
                     class="unit-val" style="cursor:default">00</span></div>
-        </div>
+                <span class="sep">:</span>
+                <div class="unit-group" data-unit="second"><span class="unit-label">S</span><span id="v-sec"
+                    class="unit-val" style="cursor:default">00</span></div>
+            </div>
     </main>
 
-    <script>
-        const J2000 = new Date('2000-01-01T12:00:00Z').getTime();
-        const ZODIAC = [{ s: '♈' }, { s: '♉' }, { s: '♊' }, { s: '♋' }, { s: '♌' }, { s: '♍' }, { s: '♎' }, { s: '♏' }, { s: '♐' }, { s: '♑' }, { s: '♒' }, { s: '♓' }];
-        const PLANETS = [
-            { id: 'mercury', sym: '☿', col: '#94a3b8', dist: 350, rate: 149472.6, long: 252.2 },
-            { id: 'venus', sym: '♀', col: '#fdba74', dist: 700, rate: 58517.8, long: 181.9 },
-            { id: 'earth', sym: '⊕', col: '#3b82f6', dist: 1050, rate: 35999.3, long: 100.4 },
-            { id: 'mars', sym: '♂', col: '#ef4444', dist: 1400, rate: 19140.3, long: 355.4 },
-            { id: 'jupiter', sym: '♃', col: '#a8a29e', dist: 1750, rate: 3034.7, long: 34.4 },
-            { id: 'saturn', sym: '♄', col: '#e7e5e4', dist: 2100, rate: 1222.4, long: 49.9 }
-        ];
+    <!-- Optional ephemeris library (uncomment to use a global provider like Astronomy Engine).
+         Example: <script src="https://unpkg.com/astronomy-engine@1.12.0/dist/astronomy.umd.min.js"></script>
+         When present, the module below will detect `window.Astronomy` and can use it as an ephemeris provider.
+    -->
 
-        let state = { days: (Date.now() - J2000) / 86400000, view: 'helio', speed: 0, direction: 1, zoom: 0.25, pos: { x: 0, y: 0 }, panning: false, history: {} };
-        PLANETS.forEach(p => state.history[p.id] = []); state.history.sun = [];
-
-        const ui = { world: document.getElementById('world'), zodiac: document.getElementById('zodiac-layer'), orbits: document.getElementById('orbits-layer'), trails: document.getElementById('trails-layer'), markers: document.getElementById('markers-layer'), planets: document.getElementById('planets-layer'), sun: document.getElementById('sun-layer'), moonSys: document.getElementById('moon-system-layer') };
-
-        function getPositions(days) {
-            const T = days / 36525.0;
-            const res = { sun: { x: 0, y: 0 } };
-            PLANETS.forEach(p => {
-                const a = ((p.long + p.rate * T) % 360) * Math.PI / 180;
-                res[p.id] = { x: p.dist * Math.cos(a), y: p.dist * Math.sin(a) };
-            });
-            res.moonAbsAng = (days * (360 / 27.321)) * Math.PI / 180;
-            res.nodeAbsAng = (-days * (360 / 6793.5)) * Math.PI / 180;
-            return res;
-        }
-
-        function render() {
-            const pos = getPositions(state.days);
-            const anchor = state.view === 'geo' ? pos.earth : { x: 0, y: 0 };
-            const zMod = (v) => v / Math.pow(state.zoom, 0.6);
-            const stroke = 1.5 / state.zoom;
-            ui.world.setAttribute('transform', `translate(${state.pos.x}, ${state.pos.y}) scale(${state.zoom})`);
-            ui.zodiac.innerHTML = '';
-            ZODIAC.forEach((z, i) => {
-                const a = (i * 30 - 90) * Math.PI / 180;
-                ui.zodiac.innerHTML += `<line x1="0" y1="0" x2="${5000 * Math.cos(a)}" y2="${5000 * Math.sin(a)}" stroke="#cbd5e1" stroke-width="${stroke}" stroke-dasharray="${10 / state.zoom} ${10 / state.zoom}" opacity="0.15" /><text x="${4000 * Math.cos(a + 0.26)}" y="${4000 * Math.sin(a + 0.26)}" fill="#94a3b8" font-size="${zMod(32)}" font-weight="900" text-anchor="middle" opacity="0.3">${z.s}</text>`;
-            });
-            ui.markers.innerHTML = ''; ui.planets.innerHTML = ''; ui.orbits.innerHTML = ''; ui.moonSys.innerHTML = '';
-            PLANETS.forEach(p => {
-                const isCenter = state.view === 'geo' && p.id === 'earth';
-                const pX = pos[p.id].x - anchor.x, pY = pos[p.id].y - anchor.y;
-                const ang = Math.atan2(pY, pX);
-                if (document.getElementById('chk-orbits').checked) ui.orbits.innerHTML += `<circle cx="${-anchor.x}" cy="${-anchor.y}" r="${p.dist}" fill="none" stroke="#e2e8f0" stroke-width="${stroke}" />`;
-                if (!isCenter) {
-                    ui.markers.innerHTML += `<text x="${3550 * Math.cos(ang)}" y="${3550 * Math.sin(ang)}" fill="${p.col}" font-size="${zMod(36)}" font-weight="bold" text-anchor="middle" alignment-baseline="middle">${p.sym}</text>`;
-                    ui.planets.innerHTML += `<g transform="translate(${pX}, ${pY})"><circle r="${zMod(12)}" fill="${p.col}" stroke="white" stroke-width="${stroke * 1.5}" /><text y="${-zMod(20)}" text-anchor="middle" font-size="${zMod(10)}" font-weight="900" fill="#1e293b">${p.sym}</text></g>`;
-                }
-            });
-            const eX = pos.earth.x - anchor.x, eY = pos.earth.y - anchor.y;
-            const mR = 120;
-            ui.moonSys.innerHTML += `<g transform="translate(${eX}, ${eY})"><circle r="${zMod(12)}" fill="#3b82f6" stroke="white" stroke-width="${stroke * 1.5}" /><circle r="${mR}" fill="none" stroke="#cbd5e1" stroke-width="${stroke}" stroke-dasharray="${4 / state.zoom} ${4 / state.zoom}" /><g transform="translate(${mR * Math.cos(pos.moonAbsAng)}, ${mR * Math.sin(pos.moonAbsAng)})"><circle r="${zMod(6)}" fill="#64748b" stroke="white" stroke-width="${stroke}" /></g><text x="${mR * Math.cos(pos.nodeAbsAng)}" y="${mR * Math.sin(pos.nodeAbsAng)}" fill="#ef4444" font-size="${zMod(18)}" font-weight="900" text-anchor="middle" alignment-baseline="middle">☊</text><text x="${mR * Math.cos(pos.nodeAbsAng + Math.PI)}" y="${mR * Math.sin(pos.nodeAbsAng + Math.PI)}" fill="#6366f1" font-size="${zMod(18)}" font-weight="900" text-anchor="middle" alignment-baseline="middle">☋</text></g>`;
-            ui.markers.innerHTML += `<text x="${3550 * Math.cos(pos.moonAbsAng)}" y="${3550 * Math.sin(pos.moonAbsAng)}" fill="#64748b" font-size="${zMod(30)}" font-weight="bold" text-anchor="middle" alignment-baseline="middle">☾</text><text x="${3650 * Math.cos(pos.nodeAbsAng)}" y="${3650 * Math.sin(pos.nodeAbsAng)}" fill="#ef4444" font-size="${zMod(24)}" font-weight="bold" text-anchor="middle" alignment-baseline="middle">☊</text><text x="${3650 * Math.cos(pos.nodeAbsAng + Math.PI)}" y="${3650 * Math.sin(pos.nodeAbsAng + Math.PI)}" fill="#6366f1" font-size="${zMod(24)}" font-weight="bold" text-anchor="middle" alignment-baseline="middle">☋</text>`;
-            const sX = pos.sun.x - anchor.x, sY = pos.sun.y - anchor.y;
-            if (state.view === 'geo') {
-                const sAng = Math.atan2(sY, sX);
-                ui.markers.innerHTML += `<text x="${3550 * Math.cos(sAng)}" y="${3550 * Math.sin(sAng)}" fill="#fbbf24" font-size="${zMod(36)}" font-weight="bold" text-anchor="middle" alignment-baseline="middle">☉</text>`;
-                ui.sun.innerHTML = `<circle cx="${sX}" cy="${sY}" r="${zMod(18)}" fill="#fbbf24" /><text x="${sX}" y="${sY}" dy="${zMod(6)}" text-anchor="middle" font-size="${zMod(20)}" font-weight="900" fill="#854d0e">☉</text>`;
-            } else {
-                ui.sun.innerHTML = `<circle cx="0" cy="0" r="${zMod(22)}" fill="#fbbf24" /><text dy="${zMod(6)}" text-anchor="middle" font-size="${zMod(22)}" font-weight="900" fill="#854d0e">☉</text>`;
-            }
-            if (document.getElementById('chk-trails').checked) {
-                ui.trails.innerHTML = '';
-                Object.keys(state.history).forEach(id => {
-                    const pts = state.history[id]; if (pts.length < 2) return;
-                    const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-                    const col = id === 'sun' ? '#fbbf24' : (PLANETS.find(pl => pl.id === id)?.col || '#94a3b8');
-                    ui.trails.innerHTML += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${stroke}" opacity="0.2" />`;
-                });
-            }
-            Object.keys(pos).filter(k => typeof pos[k] === 'object').forEach(id => {
-                if (state.history[id]) {
-                    state.history[id].push({ x: pos[id].x - anchor.x, y: pos[id].y - anchor.y });
-                    if (state.history[id].length > 200) state.history[id].shift();
-                }
-            });
-            updateHUD();
-        }
-
-        function updateHUD() {
-            const ms = J2000 + state.days * 86400000;
-            const d = new Date(ms);
-
-            // Only update input fields if they are NOT currently being edited
-            const active = document.activeElement;
-            const y = d.getUTCFullYear();
-            if (active.id !== 'v-year') document.getElementById('v-year').value = (y >= 0 ? '+' : '-') + String(Math.abs(y)).padStart(6, '0');
-            if (active.id !== 'v-month') document.getElementById('v-month').value = String(d.getUTCMonth() + 1).padStart(2, '0');
-            if (active.id !== 'v-day') document.getElementById('v-day').value = String(d.getUTCDate()).padStart(2, '0');
-
-            document.getElementById('v-hour').innerText = String(d.getUTCHours()).padStart(2, '0');
-            document.getElementById('v-min').innerText = String(d.getUTCMinutes()).padStart(2, '0');
-            document.getElementById('zoom-label').innerText = `ZOOM: ${state.zoom.toFixed(4)}x`;
-
-            const dot = document.getElementById('status-dot');
-            const lab = document.getElementById('status-label');
-            if (state.speed > 0) {
-                dot.className = state.direction > 0 ? 'dot active' : 'dot active-rev';
-                lab.innerText = state.direction > 0 ? 'ACTIVE SIM' : 'REVERSE SIM';
-            } else {
-                dot.className = 'dot'; lab.innerText = 'TIME LOCKED';
-            }
-        }
-
-        // --- NEW EDITING LOGIC ---
-        function setDateFromInputs() {
-            const yStr = document.getElementById('v-year').value;
-            const m = parseInt(document.getElementById('v-month').value) - 1;
-            const d = parseInt(document.getElementById('v-day').value);
-
-            const date = new Date(Date.UTC(2000, 0, 1, 12));
-            date.setUTCFullYear(parseInt(yStr));
-            date.setUTCMonth(m);
-            date.setUTCDate(d);
-
-            if (!isNaN(date.getTime())) {
-                state.days = (date.getTime() - J2000) / 86400000;
-                Object.keys(state.history).forEach(k => state.history[k] = []);
-            }
-        }
-
-        ['v-year', 'v-month', 'v-day'].forEach(id => {
-            const el = document.getElementById(id);
-            el.addEventListener('change', setDateFromInputs);
-            el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { setDateFromInputs(); el.blur(); } });
-        });
-
-        const vp = document.getElementById('viewport');
-        const hud = document.getElementById('hud-bg');
-
-        hud.addEventListener('wheel', (e) => { e.stopPropagation(); e.preventDefault(); }, { passive: false });
-
-        document.querySelectorAll('.unit-group').forEach(el => {
-            const unit = el.dataset.unit;
-            el.addEventListener('wheel', (e) => {
-                e.stopPropagation(); e.preventDefault();
-                const dir = e.deltaY < 0 ? 1 : -1;
-                let mult = 0;
-                if (unit === 'year') mult = 365.25; if (unit === 'month') mult = 30.44; if (unit === 'day') mult = 1;
-                if (unit === 'hour') mult = 1 / 24; if (unit === 'minute') mult = 1 / 1440;
-                state.days += dir * mult;
-                Object.keys(state.history).forEach(k => state.history[k] = []);
-            }, { passive: false });
-        });
-
-        window.addEventListener('mousemove', (e) => { if (state.panning) { state.pos.x += e.movementX; state.pos.y += e.movementY; } });
-        window.addEventListener('mouseup', () => { state.panning = false; });
-        vp.onmousedown = () => state.panning = true;
-        vp.addEventListener('wheel', (e) => { e.preventDefault(); state.zoom = Math.max(0.0001, state.zoom * (e.deltaY > 0 ? 0.9 : 1.1)); }, { passive: false });
-
-        document.getElementById('btn-helio').onclick = () => { state.view = 'helio'; document.getElementById('btn-helio').classList.add('active'); document.getElementById('btn-geo').classList.remove('active'); Object.keys(state.history).forEach(k => state.history[k] = []); };
-        document.getElementById('btn-geo').onclick = () => { state.view = 'geo'; document.getElementById('btn-geo').classList.add('active'); document.getElementById('btn-helio').classList.remove('active'); Object.keys(state.history).forEach(k => state.history[k] = []); };
-        document.getElementById('flow-fwd').onclick = () => { state.direction = 1; document.getElementById('flow-fwd').classList.add('active'); document.getElementById('flow-rev').classList.remove('active-rev'); };
-        document.getElementById('flow-rev').onclick = () => { state.direction = -1; document.getElementById('flow-rev').classList.add('active-rev'); document.getElementById('flow-fwd').classList.remove('active'); };
-        document.getElementById('btn-sync').onclick = () => { state.days = (Date.now() - J2000) / 86400000; };
-        document.getElementById('btn-reset').onclick = () => { state.zoom = 0.25; state.pos = { x: vp.clientWidth / 2, y: vp.clientHeight / 2 }; };
-
-        const slider = document.getElementById('speed-slider');
-        slider.oninput = () => { state.speed = slider.value; document.getElementById('speed-txt').innerText = 'x' + state.speed; };
-
-        function loop() {
-            if (state.speed > 0) state.days += (state.speed / 1000) * state.direction;
-            render();
-            requestAnimationFrame(loop);
-        }
-
-        window.onload = () => { state.pos = { x: vp.clientWidth / 2, y: vp.clientHeight / 2 }; loop(); };
-    </script>
+    <script type="module" src="src/sim.js"></script>
 </body>
 
 </html>
