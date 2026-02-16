@@ -8,17 +8,17 @@ const J2000 = new Date('2000-01-01T12:00:00Z').getTime();
 // Zodiac signs with their ecliptic longitude boundaries (angle between dividers varies by actual constellation width)
 const ZODIAC = [
   { s: '♈', lon: 0 },      // Aries
-  { s: '♉', lon: 23 },     // Taurus
-  { s: '♊', lon: 59 },     // Gemini
-  { s: '♋', lon: 92 },     // Cancer
-  { s: '♌', lon: 112 },    // Leo
-  { s: '♍', lon: 148 },    // Virgo
-  { s: '♎', lon: 192 },    // Libra
-  { s: '♏', lon: 215 },    // Scorpio
-  { s: '♐', lon: 241 },    // Sagittarius
-  { s: '♑', lon: 274 },    // Capricorn
-  { s: '♒', lon: 301 },    // Aquarius
-  { s: '♓', lon: 328 }     // Pisces
+  { s: '♉', lon: 30 },     // Taurus
+  { s: '♊', lon: 60 },     // Gemini
+  { s: '♋', lon: 90 },     // Cancer
+  { s: '♌', lon: 120 },    // Leo
+  { s: '♍', lon: 150 },    // Virgo
+  { s: '♎', lon: 180 },    // Libra
+  { s: '♏', lon: 210 },    // Scorpio
+  { s: '♐', lon: 240 },    // Sagittarius
+  { s: '♑', lon: 270 },    // Capricorn
+  { s: '♒', lon: 300 },    // Aquarius
+  { s: '♓', lon: 330 }     // Pisces
 ];
 const DEFAULT_PLANETS = [
   { id: 'mercury', sym: '☿', col: '#94a3b8', dist: 350, rate: 149472.6, long: 252.2 },
