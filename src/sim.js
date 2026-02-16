@@ -80,8 +80,10 @@ pool.outerRing = null;
 let ephemerisProvider = null; // optional provider function: async (days) => positions
 
 async function tryAutoProvider() {
+  console.log('Checking for astronomy libraries...');
   // If a global `Astronomy` (astronomy-engine) is present, wire a simple provider.
   if (window.Astronomy) {
+    console.log('Astronomy library detected, using for ephemeris calculations');
     ephemerisProvider = async (days) => {
       const date = new Date(J2000 + days * 86400000);
       const pos = { sun: { x: 0, y: 0 } };
@@ -89,8 +91,8 @@ async function tryAutoProvider() {
       try {
         for (const p of PLANETS) {
           const body = p.id === 'earth' ? 'Earth' : p.id.charAt(0).toUpperCase() + p.id.slice(1);
-          const vec = window.Astronomy.BodyVector(body, date);
-          // BodyVector returns { x,y,z } in AU; convert to pixels using a scale factor based on Earth's dist (~1 AU -> earth.dist)
+          const vec = window.Astronomy.HelioVector(body, date);
+          // HelioVector returns { x,y,z } in AU; convert to pixels using a scale factor based on Earth's dist (~1 AU -> earth.dist)
           const scale = PLANETS.find(pl => pl.id === 'earth')?.dist || 1000;
           pos[p.id] = { x: vec.x * scale, y: vec.y * scale };
         }
@@ -99,6 +101,7 @@ async function tryAutoProvider() {
       } catch (err) {
         // if provider call fails, fallback to linear provider
         ephemerisProvider = null;
+        console.log('Astronomy provider failed, falling back to linear model:', err);
         return linearProvider(days);
       }
       return pos;
@@ -241,11 +244,11 @@ function renderZodiacOverlay(earthWorldPos, anchor) {
   const viewportHeight = svgRect.height || 800;
   const centerX = viewportWidth / 2;
   const centerY = viewportHeight / 2;
-  
+
   // Transform Earth's world position to screen coordinates (moves on screen)
   const earthScreenX = state.pos.x + (earthWorldPos.x - anchor.x) * state.zoom;
   const earthScreenY = state.pos.y + (earthWorldPos.y - anchor.y) * state.zoom;
-  
+
   const zodiacScreenRadius = 350; // fixed screen-based radius
 
   // Draw divider lines from Earth's screen position to fixed zodiac ring
@@ -262,7 +265,7 @@ function renderZodiacOverlay(earthWorldPos, anchor) {
     line.setAttribute('stroke-dasharray', '10 10');
     line.setAttribute('opacity', '0.15');
   });
-  
+
   // Draw zodiac symbols fixed on the zodiac ring (at viewport center)
   pool.zodiacText.forEach((text, i) => {
     const lon = ZODIAC[i].lon;
@@ -288,11 +291,11 @@ async function render() {
   const stroke = (1.5 / state.zoom).toString();
 
   ui.world.setAttribute('transform', `translate(${state.pos.x}, ${state.pos.y}) scale(${state.zoom})`);
-  
+
   // Render zodiac overlay with lines radiating from Earth's position
   const earthPos = pos.earth || { x: 0, y: 0 };
   renderZodiacOverlay(earthPos, anchor);
-  
+
   // Calculate Earth's position in world coordinates (for markers ring)
   const earthX = earthPos.x - anchor.x, earthY = earthPos.y - anchor.y;
 
