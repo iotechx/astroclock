@@ -77,6 +77,32 @@ const pool = {
 pool.markerLines = {};
 pool.outerRing = null;
 
+// Cache frequently-used DOM elements to avoid repeated lookups
+const DOM = {
+  svgRoot,
+  viewport: document.getElementById('viewport'),
+  chkOrbits: document.getElementById('chk-orbits'),
+  chkTrails: document.getElementById('chk-trails'),
+  vYear: document.getElementById('v-year'),
+  vMonth: document.getElementById('v-month'),
+  vDay: document.getElementById('v-day'),
+  vHour: document.getElementById('v-hour'),
+  vMin: document.getElementById('v-min'),
+  vSec: document.getElementById('v-sec'),
+  zoomLabel: document.getElementById('zoom-label'),
+  statusDot: document.getElementById('status-dot'),
+  statusLabel: document.getElementById('status-label'),
+  speedTxt: document.getElementById('speed-txt'),
+  speedSlider: document.getElementById('speed-slider'),
+  btnHelio: document.getElementById('btn-helio'),
+  btnGeo: document.getElementById('btn-geo'),
+  flowFwd: document.getElementById('flow-fwd'),
+  flowRev: document.getElementById('flow-rev'),
+  btnSync: document.getElementById('btn-sync'),
+  btnReset: document.getElementById('btn-reset'),
+  hud: document.getElementById('hud-bg')
+};
+
 let ephemerisProvider = null; // optional provider function: async (days) => positions
 
 async function tryAutoProvider() {
@@ -113,6 +139,8 @@ function linearProvider(days) {
     const a = ((p.long + p.rate * T) % 360) * Math.PI / 180;
     res[p.id] = { x: p.dist * Math.cos(a), y: p.dist * Math.sin(a) };
   });
+
+  // outer markers layer: create a text element for each planet and additional markers
   res.moonAbsAng = (days * (360 / 27.321)) * Math.PI / 180;
   res.nodeAbsAng = (-days * (360 / 6793.5)) * Math.PI / 180;
   return res;
@@ -176,6 +204,9 @@ function initPools() {
   });
 
   // outer ring and marker lines
+  // ensure markers layer is empty before creating elements
+  while (ui.markers.firstChild) ui.markers.removeChild(ui.markers.firstChild);
+
   // create outer ring (single circle)
   const outerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   outerRing.setAttribute('fill', 'none');
@@ -184,7 +215,8 @@ function initPools() {
   outerRing.setAttribute('opacity', '0.5');
   ui.markers.appendChild(outerRing);
   pool.outerRing = outerRing;
-  // marker lines
+
+  // marker lines (one per planet)
   PLANETS.forEach(p => {
     const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     ln.setAttribute('stroke', p.col);
@@ -194,8 +226,21 @@ function initPools() {
     pool.markerLines[p.id] = ln;
   });
 
-  // outer markers layer: create a text element for each planet and some for moon/nodes/sun
-  while (ui.markers.firstChild) ui.markers.removeChild(ui.markers.firstChild);
+  // additional connector lines for moon, nodes, and sun
+  const lnMoon = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  lnMoon.setAttribute('stroke', '#64748b'); lnMoon.setAttribute('opacity', '0.15'); lnMoon.setAttribute('stroke-dasharray', `${6 / state.zoom} ${6 / state.zoom}`);
+  ui.markers.appendChild(lnMoon); pool.markerLines.moon = lnMoon;
+  const lnNodeA = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  lnNodeA.setAttribute('stroke', '#ef4444'); lnNodeA.setAttribute('opacity', '0.15'); lnNodeA.setAttribute('stroke-dasharray', `${6 / state.zoom} ${6 / state.zoom}`);
+  ui.markers.appendChild(lnNodeA); pool.markerLines.nodeA = lnNodeA;
+  const lnNodeB = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  lnNodeB.setAttribute('stroke', '#6366f1'); lnNodeB.setAttribute('opacity', '0.15'); lnNodeB.setAttribute('stroke-dasharray', `${6 / state.zoom} ${6 / state.zoom}`);
+  ui.markers.appendChild(lnNodeB); pool.markerLines.nodeB = lnNodeB;
+  const lnSun = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  lnSun.setAttribute('stroke', '#fbbf24'); lnSun.setAttribute('opacity', '0.15'); lnSun.setAttribute('stroke-dasharray', `${6 / state.zoom} ${6 / state.zoom}`);
+  ui.markers.appendChild(lnSun); pool.markerLines.sun = lnSun;
+
+  // outer markers layer: create a text element for each planet and additional markers
   PLANETS.forEach(p => {
     const m = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     ui.markers.appendChild(m);
@@ -235,7 +280,7 @@ function zMod(v) { return v / Math.pow(state.zoom, 0.6); }
 
 function renderZodiacOverlay(earthWorldPos, anchor) {
   // Get viewport dimensions for fixed zodiac ring
-  const svg = document.getElementById('svg-root');
+  const svg = DOM.svgRoot;
   const svgRect = svg.getBoundingClientRect();
   const viewportWidth = svgRect.width || 1200;
   const viewportHeight = svgRect.height || 800;
@@ -310,7 +355,7 @@ async function render() {
       oc.setAttribute('stroke', '#e2e8f0');
       oc.setAttribute('stroke-width', stroke);
       oc.setAttribute('fill', 'none');
-      oc.style.display = document.getElementById('chk-orbits').checked ? 'block' : 'none';
+      oc.style.display = DOM.chkOrbits && DOM.chkOrbits.checked ? 'block' : 'none';
     }
 
     // planet group
@@ -333,7 +378,7 @@ async function render() {
 
     // trails
     const path = pool.trailPaths[p.id];
-    if (document.getElementById('chk-trails').checked) {
+    if (DOM.chkTrails && DOM.chkTrails.checked) {
       const pts = state.history[p.id];
       if (pts && pts.length > 1) {
         const d = pts.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`).join(' ');
@@ -391,8 +436,12 @@ async function render() {
   const outerRNode = 3650;
   // outer ring (single circle) using outerR
   if (pool.outerRing) {
-    pool.outerRing.setAttribute('cx', earthX);
-    pool.outerRing.setAttribute('cy', earthY);
+    // In heliocentric view the outer markers ring should be fixed at world origin (sun).
+    // In geocentric view it should be centered on Earth (earthX, earthY).
+    const ringCx = state.view === 'helio' ? 0 : earthX;
+    const ringCy = state.view === 'helio' ? 0 : earthY;
+    pool.outerRing.setAttribute('cx', ringCx);
+    pool.outerRing.setAttribute('cy', ringCy);
     pool.outerRing.setAttribute('r', outerR);
     pool.outerRing.setAttribute('stroke-width', Math.max(1.5, parseFloat(stroke)));
     pool.outerRing.setAttribute('stroke-dasharray', `${12 / state.zoom} ${6 / state.zoom}`);
@@ -436,6 +485,73 @@ async function render() {
       ln.style.display = isCenter ? 'none' : 'block';
     }
   });
+
+  // moon connector line (from moon world position to outer marker)
+  if (pool.markerLines.moon) {
+    const ml = pool.markerLines.moon;
+    const moonWorldX = eX + mR * Math.cos(pos.moonAbsAng);
+    const moonWorldY = eY + mR * Math.sin(pos.moonAbsAng);
+    const mx = outerR * Math.cos(pos.moonAbsAng);
+    const my = outerR * Math.sin(pos.moonAbsAng);
+    ml.setAttribute('x1', moonWorldX);
+    ml.setAttribute('y1', moonWorldY);
+    ml.setAttribute('x2', mx);
+    ml.setAttribute('y2', my);
+    ml.setAttribute('stroke-width', Math.max(0.5, parseFloat(stroke) * 0.6));
+    ml.setAttribute('stroke-dasharray', `${6 / state.zoom} ${6 / state.zoom}`);
+    ml.style.display = 'block';
+  }
+
+  // lunar nodes connector lines
+  if (pool.markerLines.nodeA && pool.markerLines.nodeB) {
+    const lnA = pool.markerLines.nodeA;
+    const lnB = pool.markerLines.nodeB;
+    // Node A
+    const nodeAx = eX + mR * Math.cos(pos.nodeAbsAng);
+    const nodeAy = eY + mR * Math.sin(pos.nodeAbsAng);
+    const nax = outerRNode * Math.cos(pos.nodeAbsAng);
+    const nay = outerRNode * Math.sin(pos.nodeAbsAng);
+    lnA.setAttribute('x1', nodeAx);
+    lnA.setAttribute('y1', nodeAy);
+    lnA.setAttribute('x2', nax);
+    lnA.setAttribute('y2', nay);
+    lnA.setAttribute('stroke-width', Math.max(0.5, parseFloat(stroke) * 0.6));
+    lnA.setAttribute('stroke-dasharray', `${6 / state.zoom} ${6 / state.zoom}`);
+    lnA.style.display = 'block';
+    // Node B
+    const nodeBx = eX + mR * Math.cos(pos.nodeAbsAng + Math.PI);
+    const nodeBy = eY + mR * Math.sin(pos.nodeAbsAng + Math.PI);
+    const nbx = outerRNode * Math.cos(pos.nodeAbsAng + Math.PI);
+    const nby = outerRNode * Math.sin(pos.nodeAbsAng + Math.PI);
+    lnB.setAttribute('x1', nodeBx);
+    lnB.setAttribute('y1', nodeBy);
+    lnB.setAttribute('x2', nbx);
+    lnB.setAttribute('y2', nby);
+    lnB.setAttribute('stroke-width', Math.max(0.5, parseFloat(stroke) * 0.6));
+    lnB.setAttribute('stroke-dasharray', `${6 / state.zoom} ${6 / state.zoom}`);
+    lnB.style.display = 'block';
+  }
+
+  // sun connector line (only show in geocentric view)
+  if (pool.markerLines.sun) {
+    const lSun = pool.markerLines.sun;
+    if (state.view === 'geo') {
+      const sAng = Math.atan2(sY, sX);
+      const sx = sX;
+      const sy = sY;
+      const mx = outerR * Math.cos(sAng);
+      const my = outerR * Math.sin(sAng);
+      lSun.setAttribute('x1', sx);
+      lSun.setAttribute('y1', sy);
+      lSun.setAttribute('x2', mx);
+      lSun.setAttribute('y2', my);
+      lSun.setAttribute('stroke-width', Math.max(0.5, parseFloat(stroke) * 0.6));
+      lSun.setAttribute('stroke-dasharray', `${6 / state.zoom} ${6 / state.zoom}`);
+      lSun.style.display = 'block';
+    } else {
+      lSun.style.display = 'none';
+    }
+  }
 
   if (pool.outerMarkers.moon) {
     pool.outerMarkers.moon.textContent = '☾';
@@ -495,25 +611,30 @@ function updateHUD() {
   const d = new Date(ms);
   const active = document.activeElement;
   const y = d.getUTCFullYear();
-  if (active && active.id !== 'v-year') document.getElementById('v-year').value = (y >= 0 ? '+' : '-') + String(Math.abs(y)).padStart(6, '0');
-  if (active && active.id !== 'v-month') document.getElementById('v-month').value = String(d.getUTCMonth() + 1).padStart(2, '0');
-  if (active && active.id !== 'v-day') document.getElementById('v-day').value = String(d.getUTCDate()).padStart(2, '0');
-  document.getElementById('v-hour').innerText = String(d.getUTCHours()).padStart(2, '0');
-  document.getElementById('v-min').innerText = String(d.getUTCMinutes()).padStart(2, '0');
-  document.getElementById('v-sec').innerText = String(d.getUTCSeconds()).padStart(2, '0');
-  document.getElementById('zoom-label').innerText = `ZOOM: ${state.zoom.toFixed(4)}x`;
-  const dot = document.getElementById('status-dot');
-  const lab = document.getElementById('status-label');
-  if (state.speed > 0) { dot.className = state.direction > 0 ? 'dot active' : 'dot active-rev'; lab.innerText = state.direction > 0 ? 'ACTIVE SIM' : 'REVERSE SIM'; }
-  else { dot.className = 'dot'; lab.innerText = 'TIME LOCKED'; }
+  if (active && active.id !== 'v-year' && DOM.vYear) DOM.vYear.value = (y >= 0 ? '+' : '-') + String(Math.abs(y)).padStart(6, '0');
+  if (active && active.id !== 'v-month' && DOM.vMonth) DOM.vMonth.value = String(d.getUTCMonth() + 1).padStart(2, '0');
+  if (active && active.id !== 'v-day' && DOM.vDay) DOM.vDay.value = String(d.getUTCDate()).padStart(2, '0');
+  if (DOM.vHour) DOM.vHour.innerText = String(d.getUTCHours()).padStart(2, '0');
+  if (DOM.vMin) DOM.vMin.innerText = String(d.getUTCMinutes()).padStart(2, '0');
+  if (DOM.vSec) DOM.vSec.innerText = String(d.getUTCSeconds()).padStart(2, '0');
+  if (DOM.zoomLabel) DOM.zoomLabel.innerText = `ZOOM: ${state.zoom.toFixed(4)}x`;
+  const dot = DOM.statusDot;
+  const lab = DOM.statusLabel;
+  if (state.speed > 0) {
+    if (dot) dot.className = state.direction > 0 ? 'dot active' : 'dot active-rev';
+    if (lab) lab.innerText = state.direction > 0 ? 'ACTIVE SIM' : 'REVERSE SIM';
+  } else {
+    if (dot) dot.className = 'dot';
+    if (lab) lab.innerText = 'TIME LOCKED';
+  }
 }
 
 function setDateFromInputs() {
-  const yStr = document.getElementById('v-year').value;
-  const m = parseInt(document.getElementById('v-month').value) - 1;
-  const d = parseInt(document.getElementById('v-day').value);
+  const yStr = DOM.vYear.value;
+  const m = parseInt(DOM.vMonth.value, 10) - 1;
+  const d = parseInt(DOM.vDay.value, 10);
   const date = new Date(Date.UTC(2000, 0, 1, 12));
-  date.setUTCFullYear(parseInt(yStr));
+  date.setUTCFullYear(parseInt(yStr, 10));
   date.setUTCMonth(m);
   date.setUTCDate(d);
   if (!isNaN(date.getTime())) {
@@ -524,23 +645,35 @@ function setDateFromInputs() {
 
 // UI bindings
 function bindUI() {
-  ['v-year', 'v-month', 'v-day'].forEach(id => {
-    const el = document.getElementById(id);
-    el.addEventListener('change', setDateFromInputs);
-    el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { setDateFromInputs(); el.blur(); } });
-  });
+  // Wire year/month/day inputs (use cached DOM refs)
+  if (DOM.vYear) {
+    DOM.vYear.addEventListener('change', setDateFromInputs);
+    DOM.vYear.addEventListener('keydown', (e) => { if (e.key === 'Enter') { setDateFromInputs(); DOM.vYear.blur(); } });
+  }
+  if (DOM.vMonth) {
+    DOM.vMonth.addEventListener('change', setDateFromInputs);
+    DOM.vMonth.addEventListener('keydown', (e) => { if (e.key === 'Enter') { setDateFromInputs(); DOM.vMonth.blur(); } });
+  }
+  if (DOM.vDay) {
+    DOM.vDay.addEventListener('change', setDateFromInputs);
+    DOM.vDay.addEventListener('keydown', (e) => { if (e.key === 'Enter') { setDateFromInputs(); DOM.vDay.blur(); } });
+  }
 
-  const vp = document.getElementById('viewport');
-  const hud = document.getElementById('hud-bg');
-  hud.addEventListener('wheel', (e) => { e.stopPropagation(); e.preventDefault(); }, { passive: false });
+  const vp = DOM.viewport;
+  const hud = DOM.hud;
+  if (hud) hud.addEventListener('wheel', (e) => { e.stopPropagation(); e.preventDefault(); }, { passive: false });
   document.querySelectorAll('.unit-group').forEach(el => {
     const unit = el.dataset.unit;
     el.addEventListener('wheel', (e) => {
       e.stopPropagation(); e.preventDefault();
       const dir = e.deltaY < 0 ? 1 : -1;
       let mult = 0;
-      if (unit === 'year') mult = 365.25; if (unit === 'month') mult = 30.44; if (unit === 'day') mult = 1;
-      if (unit === 'hour') mult = 1 / 24; if (unit === 'minute') mult = 1 / 1440; if (unit === 'second') mult = 1 / 86400;
+      if (unit === 'year') mult = 365.25;
+      if (unit === 'month') mult = 30.44;
+      if (unit === 'day') mult = 1;
+      if (unit === 'hour') mult = 1 / 24;
+      if (unit === 'minute') mult = 1 / 1440;
+      if (unit === 'second') mult = 1 / 86400;
       state.days += dir * mult;
       Object.keys(state.history).forEach(k => state.history[k] = []);
     }, { passive: false });
@@ -548,22 +681,24 @@ function bindUI() {
 
   window.addEventListener('mousemove', (e) => { if (state.panning) { state.pos.x += e.movementX; state.pos.y += e.movementY; } });
   window.addEventListener('mouseup', () => { state.panning = false; });
-  vp.onmousedown = () => state.panning = true;
-  vp.addEventListener('wheel', (e) => { e.preventDefault(); state.zoom = Math.max(0.0001, state.zoom * (e.deltaY > 0 ? 0.9 : 1.1)); }, { passive: false });
+  if (vp) {
+    vp.onmousedown = () => state.panning = true;
+    vp.addEventListener('wheel', (e) => { e.preventDefault(); state.zoom = Math.max(0.0001, state.zoom * (e.deltaY > 0 ? 0.9 : 1.1)); }, { passive: false });
+  }
 
-  document.getElementById('btn-helio').onclick = () => { state.view = 'helio'; document.getElementById('btn-helio').classList.add('active'); document.getElementById('btn-geo').classList.remove('active'); Object.keys(state.history).forEach(k => state.history[k] = []); };
-  document.getElementById('btn-geo').onclick = () => { state.view = 'geo'; document.getElementById('btn-geo').classList.add('active'); document.getElementById('btn-helio').classList.remove('active'); Object.keys(state.history).forEach(k => state.history[k] = []); };
-  document.getElementById('flow-fwd').onclick = () => { state.direction = 1; document.getElementById('flow-fwd').classList.add('active'); document.getElementById('flow-rev').classList.remove('active-rev'); };
-  document.getElementById('flow-rev').onclick = () => { state.direction = -1; document.getElementById('flow-rev').classList.add('active-rev'); document.getElementById('flow-fwd').classList.remove('active'); };
-  document.getElementById('btn-sync').onclick = () => { state.days = (Date.now() - J2000) / 86400000; };
-  document.getElementById('btn-reset').onclick = () => { calculateFitZoom(vp); };
+  if (DOM.btnHelio) DOM.btnHelio.onclick = () => { state.view = 'helio'; DOM.btnHelio.classList.add('active'); if (DOM.btnGeo) DOM.btnGeo.classList.remove('active'); Object.keys(state.history).forEach(k => state.history[k] = []); };
+  if (DOM.btnGeo) DOM.btnGeo.onclick = () => { state.view = 'geo'; DOM.btnGeo.classList.add('active'); if (DOM.btnHelio) DOM.btnHelio.classList.remove('active'); Object.keys(state.history).forEach(k => state.history[k] = []); };
+  if (DOM.flowFwd) DOM.flowFwd.onclick = () => { state.direction = 1; DOM.flowFwd.classList.add('active'); if (DOM.flowRev) DOM.flowRev.classList.remove('active-rev'); };
+  if (DOM.flowRev) DOM.flowRev.onclick = () => { state.direction = -1; DOM.flowRev.classList.add('active-rev'); if (DOM.flowFwd) DOM.flowFwd.classList.remove('active'); };
+  if (DOM.btnSync) DOM.btnSync.onclick = () => { state.days = (Date.now() - J2000) / 86400000; };
+  if (DOM.btnReset) DOM.btnReset.onclick = () => { calculateFitZoom(vp); };
 
-  const slider = document.getElementById('speed-slider');
-  slider.oninput = () => { state.speed = slider.value; document.getElementById('speed-txt').innerText = 'x' + state.speed; };
+  const slider = DOM.speedSlider || document.getElementById('speed-slider');
+  if (slider) slider.oninput = () => { state.speed = Number(slider.value); if (DOM.speedTxt) DOM.speedTxt.innerText = 'x' + state.speed; };
 
   // display toggles
-  document.getElementById('chk-orbits').addEventListener('change', () => { /* handled in render */ });
-  document.getElementById('chk-trails').addEventListener('change', () => { /* handled in render */ });
+  if (DOM.chkOrbits) DOM.chkOrbits.addEventListener('change', () => { /* handled in render */ });
+  if (DOM.chkTrails) DOM.chkTrails.addEventListener('change', () => { /* handled in render */ });
 }
 
 // Planet scale/label UI removed per user request.
@@ -590,7 +725,7 @@ async function init() {
   await tryAutoProvider();
   initPools();
   bindUI();
-  const vp = document.getElementById('viewport');
+  const vp = DOM.viewport || document.getElementById('viewport');
   calculateFitZoom(vp);
   loop();
 }
