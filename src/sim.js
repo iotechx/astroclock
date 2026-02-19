@@ -21,12 +21,12 @@ const ZODIAC = [
   { s: '♓', lon: 330 }     // Pisces
 ];
 const DEFAULT_PLANETS = [
-  { id: 'mercury', sym: '☿', col: '#94a3b8', dist: 350, rate: 149472.6, long: 252.2 },
-  { id: 'venus', sym: '♀', col: '#fdba74', dist: 700, rate: 58517.8, long: 181.9 },
+  { id: 'mercury', sym: '☿', col: '#7c7c7c', dist: 350, rate: 149472.6, long: 252.2 },
+  { id: 'venus', sym: '♀', col: '#e2da3c', dist: 700, rate: 58517.8, long: 181.9 },
   { id: 'earth', sym: '⊕', col: '#3b82f6', dist: 1050, rate: 35999.3, long: 100.4 },
-  { id: 'mars', sym: '♂', col: '#ef4444', dist: 1400, rate: 19140.3, long: 355.4 },
-  { id: 'jupiter', sym: '♃', col: '#a8a29e', dist: 1750, rate: 3034.7, long: 34.4 },
-  { id: 'saturn', sym: '♄', col: '#e7e5e4', dist: 2100, rate: 1222.4, long: 49.9 }
+  { id: 'mars', sym: '♂', col: '#fd0000', dist: 1400, rate: 19140.3, long: 355.4 },
+  { id: 'jupiter', sym: '♃', col: '#692c03', dist: 1750, rate: 3034.7, long: 34.4 },
+  { id: 'saturn', sym: '♄', col: '#02034b', dist: 2100, rate: 1222.4, long: 49.9 }
 ];
 
 let PLANETS = JSON.parse(JSON.stringify(DEFAULT_PLANETS));
