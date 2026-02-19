@@ -111,19 +111,55 @@ async function tryAutoProvider() {
     ephemerisProvider = async (days) => {
       const date = new Date(J2000 + days * 86400000);
       const pos = { sun: { x: 0, y: 0 } };
-      // Map simple list: Astronomy.Equator ecliptic isn't guaranteed; do best-effort using Astronomy.Equator/Vector if available.
+      // Map simple list: Use HelioVector to get positions, which are in AU
       try {
+        // Map planet IDs to Astronomy.Body enum values
+        const bodyMap = {
+          'mercury': 'Mercury',
+          'venus': 'Venus',
+          'earth': 'Earth',
+          'mars': 'Mars',
+          'jupiter': 'Jupiter',
+          'saturn': 'Saturn'
+        };
+        
+        // Use Earth's actual distance as scale (always ~1 AU)
+        const scale = PLANETS.find(pl => pl.id === 'earth')?.dist || 1000;
+        
         for (const p of PLANETS) {
-          const body = p.id === 'earth' ? 'Earth' : p.id.charAt(0).toUpperCase() + p.id.slice(1);
-          const vec = window.Astronomy.Ecliptic(body, date);
-          // BodyVector returns { x,y,z } in AU; convert to pixels using a scale factor based on Earth's dist (~1 AU -> earth.dist)
-          const scale = PLANETS.find(pl => pl.id === 'earth')?.dist || 1000;
+          const bodyName = bodyMap[p.id];
+          if (!bodyName) continue;
+          
+          // HelioVector returns { x,y,z } in AU; convert to pixels
+          const vec = window.Astronomy.HelioVector(bodyName, date);
           pos[p.id] = { x: vec.x * scale, y: vec.y * scale };
         }
-        pos.moonAbsAng = (days * (360 / 27.321)) * Math.PI / 180;
+        
+        // Calculate accurate moon phase from sun-moon angle as seen from Earth
+        const earthVec = window.Astronomy.HelioVector('Earth', date);
+        const moonGeo = window.Astronomy.GeoMoon(date);  // Moon relative to Earth
+        // Moon's heliocentric position
+        const moonHelo = {
+          x: earthVec.x + moonGeo.x,
+          y: earthVec.y + moonGeo.y,
+          z: earthVec.z + moonGeo.z
+        };
+        
+        // Get sun's ecliptic longitude and moon's ecliptic longitude as seen from Earth
+        const sunEcliptic = window.Astronomy.EclipticLongitude('Sun', date);
+        const moonEcliptic = window.Astronomy.EclipticLongitude('Moon', date);
+        
+        // Elongation: angle between sun and moon as seen from Earth
+        let moonPhaseAngle = moonEcliptic - sunEcliptic;
+        // Normalize to [0, 360)
+        while (moonPhaseAngle < 0) moonPhaseAngle += 360;
+        while (moonPhaseAngle >= 360) moonPhaseAngle -= 360;
+        
+        pos.moonAbsAng = (moonPhaseAngle * Math.PI / 180);
         pos.nodeAbsAng = (-days * (360 / 6793.5)) * Math.PI / 180;
       } catch (err) {
         // if provider call fails, fallback to linear provider
+        console.warn('Astronomy provider failed, falling back to linear model:', err);
         ephemerisProvider = null;
         return linearProvider(days);
       }
@@ -141,7 +177,7 @@ function linearProvider(days) {
   });
 
   // outer markers layer: create a text element for each planet and additional markers
-  res.moonAbsAng = (days * (360 / 27.321)) * Math.PI / 180;
+  res.moonAbsAng = (days * (360 / 29.530588)) * Math.PI / 180;
   res.nodeAbsAng = (-days * (360 / 6793.5)) * Math.PI / 180;
   return res;
 }
@@ -432,8 +468,16 @@ async function render() {
     pool.sunText.removeAttribute('x'); pool.sunText.removeAttribute('y'); pool.sunText.textContent = '☉';
   }
   // Outer-ring markers (planet symbols, moon, nodes, sun marker)
-  const outerR = 3550;
-  const outerRNode = 3650;
+  // Calculate dynamic outer ring radius based on farthest planet position
+  let maxDist = 3550; // minimum
+  PLANETS.forEach(p => {
+    const pPos = pos[p.id] || { x: 0, y: 0 };
+    const pX = pPos.x - anchor.x, pY = pPos.y - anchor.y;
+    const dist = Math.sqrt(pX * pX + pY * pY);
+    if (dist > maxDist) maxDist = dist;
+  });
+  const outerR = Math.max(3550, maxDist * 1.15); // Scale outer ring with 15% padding
+  const outerRNode = outerR + 100;
   // outer ring (single circle) using outerR
   if (pool.outerRing) {
     // In heliocentric view the outer markers ring should be fixed at world origin (sun).
